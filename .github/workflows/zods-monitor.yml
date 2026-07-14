@@ -1,0 +1,44 @@
+name: ZODS Website Monitor
+
+on:
+  schedule:
+    - cron: "2-59/5 * * * *"
+
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install requirements
+        run: python -m pip install requests
+
+      - name: Check ZODS website
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python monitor.py
+
+      - name: Save latest website state
+        run: |
+          if git diff --quiet state.json 2>/dev/null && git ls-files --error-unmatch state.json >/dev/null 2>&1; then
+            echo "No state change to save."
+          else
+            git config user.name "zods-monitor-bot"
+            git config user.email "zods-monitor-bot@users.noreply.github.com"
+            git add state.json
+            git commit -m "Update ZODS website state" || exit 0
+            git push
+          fi
